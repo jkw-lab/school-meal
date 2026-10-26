@@ -1,0 +1,7 @@
+import {NextRequest,NextResponse} from 'next/server';import {neon} from '@neondatabase/serverless';export const runtime='nodejs';
+export async function GET(req:NextRequest){if(!process.env.DATABASE_URL)return NextResponse.json({error:'DB 미연결'},{status:503});const p=req.nextUrl.searchParams,office=p.get('office')||'N10',code=p.get('code')||'8140270';if(!/^[A-Z]\d{2}$/.test(office)||!/^\d{7,12}$/.test(code))return NextResponse.json({error:'학교 코드 오류'},{status:400});try{const db=neon(process.env.DATABASE_URL);
+const days=await db`SELECT COUNT(*)::int AS count,COUNT(DISTINCT meal_date)::int AS days,ROUND(AVG(calorie_kcal),1) AS kcal FROM meals WHERE office_code=${office} AND school_code=${code}`;
+const kinds=await db`SELECT meal_type AS type,COUNT(*)::int AS count,ROUND(AVG(calorie_kcal),1) AS kcal FROM meals WHERE office_code=${office} AND school_code=${code} GROUP BY meal_type ORDER BY meal_type`;
+const weekdays=await db`SELECT EXTRACT(DOW FROM meal_date)::int AS weekday,COUNT(*)::int AS count,ROUND(AVG(calorie_kcal),1) AS kcal FROM meals WHERE office_code=${office} AND school_code=${code} GROUP BY 1 ORDER BY 1`;
+const menu=await db`SELECT trim(x.item) AS name,COUNT(*)::int AS count FROM meals m CROSS JOIN LATERAL unnest(string_to_array(m.raw_menu,E'\n')) AS x(item) WHERE m.office_code=${office} AND m.school_code=${code} AND trim(x.item)<>'' GROUP BY 1 ORDER BY count DESC LIMIT 12`;
+return NextResponse.json({summary:days[0],kinds,weekdays,menu});}catch{return NextResponse.json({error:'분석 오류'},{status:500})}}

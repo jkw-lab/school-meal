@@ -1,0 +1,1 @@
+import "./globals.css"; export const metadata={title:"School Meal",description:"급식 아카이브"};export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="ko"><body>{children}</body></html>}

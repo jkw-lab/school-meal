@@ -1,0 +1,1 @@
+export const school={office:"N10",code:"8140270",name:"북일고등학교"};export const labels=["아침","점심","저녁"] as const;
