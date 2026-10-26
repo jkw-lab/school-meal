@@ -23,8 +23,7 @@ BEGIN
  RETURN NEW;
 END
 $$ LANGUAGE plpgsql;
-DROP TRIGGER IF EXISTS trg_meal_revision ON meals;
-CREATE TRIGGER trg_meal_revision BEFORE UPDATE ON meals FOR EACH ROW EXECUTE FUNCTION log_meal_revision();
+CREATE OR REPLACE TRIGGER trg_meal_revision BEFORE UPDATE ON meals FOR EACH ROW EXECUTE FUNCTION log_meal_revision();
 CREATE TABLE IF NOT EXISTS backfill_cursors (
  office_code text NOT NULL,
  school_code text NOT NULL,

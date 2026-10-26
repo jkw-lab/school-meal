@@ -16,6 +16,7 @@ export const nutrientMeta:Record<NutrientId,{name:string;unit:string}>={
 export const nutrientOrder:NutrientId[]=['protein','calcium','iron','vitc','thiamin','riboflavin'];
 export function nutrientId(raw:string):NutrientId|null{
  const x=raw.toLowerCase().replace(/\s+/g,'');
+ if(['carb','protein','fat','calcium','iron','vitc','thiamin','riboflavin'].includes(x))return x as NutrientId;
  if(x.startsWith('탄수화물'))return 'carb';if(x.startsWith('단백질'))return 'protein';
  if(x.startsWith('지방'))return 'fat';if(x.startsWith('칼슘'))return 'calcium';
  if(x.startsWith('철분')||x.startsWith('철('))return 'iron';

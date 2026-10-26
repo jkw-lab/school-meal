@@ -150,7 +150,7 @@ export default function Home(){
  <p className="note">각 칸은 해당 요일·식사의 기록 중 선택한 음식 유형이 등장한 비율입니다. 표본이 적으면 변동이 클 수 있어요.</p></div></>}
  {analysisTab==='nutrition'&&<><h2>탄수화물 · 단백질 · 지방</h2><div className="surface">{stats.macroAverage?<><div className="macro-bar"><span style={{width:stats.macroAverage.carb+'%'}}/><span style={{width:stats.macroAverage.protein+'%'}}/><span style={{width:stats.macroAverage.fat+'%'}}/></div><div className="macro-labels"><span>탄수 {nfmt(stats.macroAverage.carb)}%</span><span>단백질 {nfmt(stats.macroAverage.protein)}%</span><span>지방 {nfmt(stats.macroAverage.fat)}%</span></div></>:<p className="quiet">분석 가능한 영양 자료가 없습니다.</p>}<p className="note">각 끼니의 4·4·9 환산 비율을 평균한 수치입니다.</p></div>
  <h2>영양소별 평균 제공량</h2><div className="surface"><div className="comparison-select"><span className="quiet">2025 KDRI · 15–18세</span><select value={profile} onChange={e=>onProfile(e.target.value as ReferenceProfile)}><option value="male">남 기준</option><option value="female">여 기준</option></select></div>
- <NutritionMeters nutrients={Object.fromEntries(stats.nutrients.filter(x=>x.average!==null).map(x=>[x.id,x.average]))} profile={profile}/>
+ <NutritionMeters nutrients={Object.fromEntries(stats.nutrients.filter(x=>x.average!==null).map(x=>[x.id,x.average as number])) as Record<string,number>} profile={profile}/>
  <div className="detail-line"><span>자료 표본</span><strong>{stats.summary.count}끼</strong></div>
  <p className="note">평균은 해당 영양소가 기록된 식단만 사용하며, 하루 권장량과 제공량을 비교합니다.</p></div>
  <h2>영양소 자료 범위</h2><div className="surface">{stats.nutrients.filter(x=>x.sampleCount>0).map(n=><div className="detail-line" key={n.id}><span>{n.name}</span><strong>{nfmt(n.min,1)}–{nfmt(n.max,1)} {n.unit}</strong></div>)}</div>
