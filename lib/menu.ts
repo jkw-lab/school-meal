@@ -20,8 +20,8 @@ export function menuCategory(name:string):MenuCategory{
  if(/(주스|쥬스|에이드|음료|식혜|콜라|차$)/.test(n))return '음료';
  if(/(빵|케이크|쿠키|머핀|과자|파이|푸딩|아이스크림|모찌|와플|도넛)/.test(n))return '빵·디저트';
  if(/(고등어|갈치|새우|오징어|명태|생선|연어|참치|조기|어묵|게살|해물|해산물|가자미)/.test(n))return '해산물';
- if(/(닭|돼지|쇠고기|소고기|한우|갈비|불고기|제육|오리|족발|스테이크|소시지|소세지|돈까스|치킨|계란|달걀|햄|장조림)/.test(n))return '육류·달걀';
- if(/(나물|샐러드|무침|시금치|콩나물|숙주|오이|호박|감자|가지|두부|김$|볶음)/.test(n))return '채소·반찬';
+ if(/(닭|돼지|쇠고기|소고기|한우|갈비|불고기|제육|불낙|오리|족발|스테이크|소시지|소세지|돈까스|치킨|계란|달걀|햄|장조림)/.test(n))return '육류·달걀';
+ if(/(나물|샐러드|무침|시금치|콩나물|숙주|오이|호박|감자|가지|두부|김$)/.test(n))return '채소·반찬';
  return '기타';
 }
 export function parseMenu(raw:string):{raw_name:string;normalized_name:string;category:MenuCategory;item_order:number}[]{
