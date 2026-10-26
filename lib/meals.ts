@@ -74,6 +74,15 @@ export async function archiveMeals(office:string,code:string,name:string,meals:S
   AS it(item_order integer,raw_name text,normalized_name text,category text)
  ON CONFLICT(meal_id,item_order) DO UPDATE SET
  raw_name=EXCLUDED.raw_name,normalized_name=EXCLUDED.normalized_name,category=EXCLUDED.category`;
+ // 메뉴 수정으로 항목 수가 줄어든 경우, 예전 항목이 통계에 남지 않도록 정리한다.
+ await db`WITH incoming AS (
+   SELECT * FROM jsonb_to_recordset(${JSON.stringify(batch)}::jsonb)
+   AS x(meal_date date,meal_type smallint,items jsonb)
+ )
+ DELETE FROM meal_items mi USING meals m, incoming i
+ WHERE mi.meal_id=m.id AND m.office_code=${office} AND m.school_code=${code}
+  AND m.meal_date=i.meal_date AND m.meal_type=i.meal_type
+  AND mi.item_order>=jsonb_array_length(i.items)`;
  return meals.length;
 }
 export async function archivedMeals(office:string,code:string,from:string,to:string):Promise<Meal[]>{

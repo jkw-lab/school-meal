@@ -15,6 +15,10 @@ export async function GET(req:NextRequest){
    if(cached.length)return NextResponse.json({meals:cached,source:'archive'});
   }
   const fresh=await fetchMeals(office,code,from,to);
+  if(fresh.length===0){
+   const archived=await archivedMeals(office,code,from,to).catch(()=>[]);
+   if(archived.length)return NextResponse.json({meals:archived,source:'archive',stale:true});
+  }
   // DB 에러 때문에 NEIS 조회까지 실패 처리하지 않는다.
   await archiveMeals(office,code,name,fresh).catch(e=>console.error('meal archive failure',e));
   return NextResponse.json({meals:fresh,source:'neis'},{headers:{'Cache-Control':'public, s-maxage=300, stale-while-revalidate=600'}});
