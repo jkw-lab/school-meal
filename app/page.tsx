@@ -1,6 +1,8 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {kstDate,shiftDay,mondayOf} from '@/lib/time';
+import {canonicalMenu,splitMenuItems} from '@/lib/menu';
+import FavoritesPanel from './components/FavoritesPanel';
 import {normalizeNutrients,nutrientMeta,nutrientOrder,reference,macroRatio,type ReferenceProfile,type NutrientId} from '@/lib/nutrition';
 type School={office:string;code:string;name:string};
 type Meal={date:string;type:number;menu:string[];kcal:number|null;nutrients:Record<string,number>};
@@ -13,7 +15,7 @@ type Stats={summary:Summary;previous:{count:number;kcal:number|null}|null;byMeal
  topMenus:{name:string;category:string;count:number;mealRate:number;repeatDays:number|null}[];
  categories:{category:string;count:number;mealRate:number}[];
  heatmap:{category:string;weekday:number;type:number;meals:number;matched:number;rate:number|null}[];trend:Trend[];dataNote:string};
-type Section='meals'|'analytics'|'settings';type AnalysisTab='overview'|'menu'|'nutrition'|'trend';
+type Section='meals'|'analytics'|'favorites'|'settings';type AnalysisTab='overview'|'menu'|'nutrition'|'trend';
 const defaultSchool:School={office:'N10',code:'8140270',name:'북일고등학교'};
 const weekdays=['일','월','화','수','목','금','토'];
 const mealNames=['','아침','점심','저녁'];
@@ -71,12 +73,14 @@ export default function Home(){
  const [notice,setNotice]=useState(''),[statsNotice,setStatsNotice]=useState(''),[search,setSearch]=useState(''),[searching,setSearching]=useState(false);
  const [matches,setMatches]=useState<School[]>([]),[dataStatus,setDataStatus]=useState<{data?:{meals:number;days:number;oldest:string;newest:string};sync?:{status:string;started:string;count:number};backfill?:{cursor:string;completed:boolean}}|null>(null);
  const [chosenCategory,setChosenCategory]=useState('국·찌개'),[metric,setMetric]=useState<TrendBarsProp>('kcal');
+ const [favorites,setFavorites]=useState<string[]>([]),[selectedMenu,setSelectedMenu]=useState('');
  const swipe=useRef<number|null>(null),mealCache=useRef<Map<string,Meal[]>>(new Map()),statsCache=useRef<Map<string,Stats>>(new Map());
  type TrendBarsProp='kcal'|'protein'|'calcium'|'iron'|'vitc'|'uniqueMenus';
  useEffect(()=>{setDate(kstDate());try{
   const stored=localStorage.getItem('school-meal-school');if(stored){const s=JSON.parse(stored);if(typeof s.office==='string'&&typeof s.code==='string'&&typeof s.name==='string')setSchool(s)}
   const pref=localStorage.getItem('school-meal-reference');if(pref==='male'||pref==='female')setProfile(pref);
  }catch{}},[]);
+ useEffect(()=>{try{const value=localStorage.getItem('school-meal-favorites:'+school.office+':'+school.code);const saved=value?JSON.parse(value):[];setFavorites(Array.isArray(saved)?[...new Set<string>(saved.filter((x:unknown)=>typeof x==='string'&&x.length<=100))]:[])}catch{setFavorites([])}},[school.office,school.code]);
  const weekStart=useMemo(()=>date?mondayOf(date):'',[date]),weekEnd=weekStart?shiftDay(weekStart,6):'';
  const week=useMemo(()=>weekStart?Array.from({length:7},(_,i)=>shiftDay(weekStart,i)):[],[weekStart]);
  const mealKey=school.office+':'+school.code+':'+weekStart;
@@ -111,12 +115,17 @@ export default function Home(){
  },[section,school]);
  const meal=list.find(m=>m.date===date&&m.type===mealType);
  const onProfile=(value:ReferenceProfile)=>{setProfile(value);try{localStorage.setItem('school-meal-reference',value)}catch{}};
+ function toggleFavorite(name:string){const canonical=canonicalMenu(name);if(!canonical)return;
+  setFavorites(old=>{const next=old.includes(canonical)?old.filter(x=>x!==canonical):[...old,canonical];
+   try{localStorage.setItem('school-meal-favorites:'+school.office+':'+school.code,JSON.stringify(next))}catch{}return next;});
+ }
+ function viewMenuDetail(name:string){setSelectedMenu(canonicalMenu(name));setSection('favorites')}
  async function findSchool(){
   if(search.trim().length<2)return;
   setSearching(true);setNotice('');try{const response=await fetch('/api/schools?q='+encodeURIComponent(search.trim()));const data=await response.json();if(!response.ok)throw new Error(data.error||'검색 실패');setMatches(data.schools||[]);}catch(e){setNotice(String(e))}finally{setSearching(false)}
  }
- function chooseSchool(s:School){setSchool(s);setMatches([]);setSearch('');setList([]);setStats(null);setSection('meals');setNotice('');try{localStorage.setItem('school-meal-school',JSON.stringify(s))}catch{}}
- const navs:{tab:Section;label:string;icon:string}[]=[{tab:'meals',label:'식단',icon:'▤'},{tab:'analytics',label:'분석',icon:'▥'},{tab:'settings',label:'설정',icon:'⚙'}];
+ function chooseSchool(s:School){setSchool(s);setMatches([]);setSearch('');setList([]);setStats(null);setSelectedMenu('');setSection('meals');setNotice('');try{localStorage.setItem('school-meal-school',JSON.stringify(s))}catch{}}
+ const navs:{tab:Section;label:string;icon:string}[]=[{tab:'meals',label:'식단',icon:'▤'},{tab:'analytics',label:'분석',icon:'▥'},{tab:'favorites',label:'즐겨찾기',icon:'☆'},{tab:'settings',label:'설정',icon:'⚙'}];
  return <div className="app-shell">
  <header className="topbar"><div className="eyebrow">SCHOOL MEAL</div><button className="school-select" onClick={()=>setSection('settings')}>{school.name} <span aria-hidden="true">⌄</span></button></header>
  <main className="main-area">
@@ -126,7 +135,7 @@ export default function Home(){
  <PillTabs options={[1,2,3].map(n=>({value:n,label:mealNames[n]}))} value={mealType} onChange={setMealType}/>
  <article className="surface meal-surface"><div className="eyebrow">{['','BREAKFAST','LUNCH','DINNER'][mealType]}</div>
  {loading&&!meal?<div className="skeleton-stack"><div/><div/><div/><div/></div>:
- meal?<><div className="meal-menu">{meal.menu.map((m,i)=><p key={i}>{m}</p>)}</div><div className="detail-line"><span>제공 열량</span><strong>{meal.kcal===null?'자료 없음':nfmt(meal.kcal,1)+' kcal'}</strong></div>
+ meal?<><div className="meal-menu">{splitMenuItems(meal.menu).map((m,i)=><div className="meal-menu-item" key={i}><button className="meal-menu-label" onClick={()=>viewMenuDetail(m)} title="메뉴 통계 보기">{m}</button><button className={'favorite-star '+(favorites.includes(canonicalMenu(m))?'is-on':'')} aria-pressed={favorites.includes(canonicalMenu(m))} aria-label={m+(favorites.includes(canonicalMenu(m))?' 즐겨찾기 해제':' 즐겨찾기 추가')} onClick={()=>toggleFavorite(m)}>{favorites.includes(canonicalMenu(m))?'★':'☆'}</button></div>)}</div><div className="detail-line"><span>제공 열량</span><strong>{meal.kcal===null?'자료 없음':nfmt(meal.kcal,1)+' kcal'}</strong></div>
  <h2 className="inside-heading">영양소 비교</h2><div className="comparison-select"><span className="quiet">2025 KDRI · 15–18세 참고 기준</span><select value={profile} onChange={e=>onProfile(e.target.value as ReferenceProfile)} aria-label="권장섭취량 비교 기준"><option value="male">남</option><option value="female">여</option></select></div>
  <NutritionMeters nutrients={meal.nutrients} profile={profile}/><MacroBar nutrients={meal.nutrients}/></>:<div className="empty-state">{loading?'급식을 불러오는 중':'등록된 급식이 없어요.'}</div>}
  </article>{notice&&<p className="alert-text">{notice}</p>}<p className="note">급식 정보 출처: 교육부 NEIS · 날짜를 좌우로 넘길 수 있어요.</p>
@@ -142,7 +151,7 @@ export default function Home(){
  <h2>요일별 평균 열량</h2><div className="surface"><SmallBars rows={stats.byWeekday.map(x=>({label:weekdays[x.weekday],value:x.kcal,hint:'kcal'}))}/></div>
  <h2>주말과 평일</h2><div className="surface"><div className="detail-line"><span>평일 평균</span><strong>{nfmt(stats.weekend.weekday.kcal,1)} kcal</strong></div><div className="detail-line"><span>주말 평균</span><strong>{nfmt(stats.weekend.weekend.kcal,1)} kcal</strong></div><p className="note">평일 {stats.weekend.weekday.count}끼 · 주말 {stats.weekend.weekend.count}끼</p></div></>}
  {analysisTab==='menu'&&<><div className="surface"><div className="eyebrow">MENU FREQUENCY</div><div className="headline-number">{stats.topMenus.length?stats.topMenus[0].count:0}<small> 회</small></div><p className="quiet">가장 많이 등장한 음식의 기록 횟수</p></div>
- <h2>자주 나오는 메뉴</h2><div className="surface ranked-list">{stats.topMenus.map((m,i)=><div className="ranked-item" key={m.name}><span className="rank">{i+1}</span><div><strong>{m.name}</strong><small>{m.category} · 급식 등장률 {m.mealRate}%{m.repeatDays!==null?' · 평균 '+m.repeatDays+'일 간격':''}</small></div><b>{m.count}회</b></div>)}</div>
+ <h2>자주 나오는 메뉴</h2><div className="surface ranked-list">{stats.topMenus.map((m,i)=><div className="ranked-item" key={m.name}><span className="rank">{i+1}</span><div><button className="favorite-rank-name" onClick={()=>viewMenuDetail(m.name)}>{m.name}</button><small>{m.category} · 급식 등장률 {m.mealRate}%{m.repeatDays!==null?' · 평균 '+m.repeatDays+'일 간격':''}</small></div><button className={'favorite-star '+(favorites.includes(m.name)?'is-on':'')} aria-pressed={favorites.includes(m.name)} aria-label={m.name+(favorites.includes(m.name)?' 즐겨찾기 해제':' 즐겨찾기 추가')} onClick={()=>toggleFavorite(m.name)}>{favorites.includes(m.name)?'★':'☆'}</button><b>{m.count}회</b></div>)}</div>
  <h2>음식 유형별 빈도</h2><div className="surface"><SmallBars rows={stats.categories.map(c=>({label:c.category,value:c.count,hint:'회'}))}/><p className="note">전체 메뉴 항목의 등장 횟수입니다. 한 끼에 같은 유형이 여러 번 포함될 수 있어요.</p></div>
  <h2>요일 × 식사 시간대</h2><div className="surface"><div className="comparison-select"><span className="quiet">확인할 음식 유형</span><select value={chosenCategory} onChange={e=>setChosenCategory(e.target.value)}>{['밥·죽','국·찌개','면','육류·달걀','해산물','채소·반찬','김치','과일','유제품','빵·디저트','음료','기타'].map(c=><option key={c}>{c}</option>)}</select></div>
  <div className="heatmap"><div className="heat-head">요일</div>{[1,2,3].map(n=><div className="heat-head" key={n}>{mealNames[n]}</div>)}
@@ -162,6 +171,7 @@ export default function Home(){
  <p className="data-caption">분석 범위: {stats.summary.oldest} ~ {stats.summary.newest} · {stats.dataNote}</p>
  </>}
  </section>}
+ {section==='favorites'&&<FavoritesPanel school={school} favorites={favorites} onToggle={toggleFavorite} selectedMenu={selectedMenu} onSelect={setSelectedMenu}/>}
  {section==='settings'&&<section><div className="page-heading"><div><div className="eyebrow">PREFERENCES</div><h1>설정</h1></div></div>
  <h2>학교 선택</h2><div className="surface"><p className="strong-text">{school.name}</p><div className="school-search"><input value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void findSchool()}} placeholder="학교 이름 입력" aria-label="학교 검색"/><button onClick={()=>void findSchool()} disabled={searching}>{searching?'검색 중':'검색'}</button></div>{matches.map(x=><button className="school-result" onClick={()=>chooseSchool(x)} key={x.office+x.code}>{x.name}<span>선택</span></button>)}</div>
  {notice&&<p className="alert-text">{notice}</p>}

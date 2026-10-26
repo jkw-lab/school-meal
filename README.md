@@ -43,3 +43,10 @@ See `.env.example`. `npm run build` runs type validation through Next.
 - Ratio is `meal nutrient provision / daily RNI × 100`, **not** a per-meal target and not a deficiency or health score. Energy intake and absent nutrients cannot be inferred from the menu.
 - A category heatmap rate counts meals containing a category divided by meals recorded in that weekday/type slot; users should mind small samples.
 - Backfill can only retrieve records still returned by NEIS. Unsupplied nutrient values must not be estimated.
+
+## Menu favorites (free, no user accounts)
+
+- Tap ☆ next to an item in a meal, top-menu ranking, or menu search results. Saved ★ items appear in **즐겨찾기**.
+- Favorites use each device/browser's `localStorage`, scoped to the selected school. They are **not synced between devices**, and clearing browsing data resets the list. No favorite records are added to Neon.
+- The selected menu's history is queried read-only from Neon via `/api/menu-stats`; `/api/menu-search` searches normalized menu names already archived. Statistics include past meals through today only. Upcoming scheduled meals are listed separately.
+- Query filters use exact normalized names; school/day/time counts remain contingent on NEIS archive coverage.
