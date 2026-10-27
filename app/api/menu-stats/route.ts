@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {neon} from '@neondatabase/serverless';
+import {isArchivedSchool} from '@/lib/meals';
 import {canonicalMenu} from '@/lib/menu';
 import {kstDate,shiftDay} from '@/lib/time';
 export const runtime='nodejs';
@@ -10,6 +11,7 @@ export async function GET(req:NextRequest){
  raw=p.get('menu')||'',period=p.get('period')||'all';
  if(!/^[A-Z]\d{2}$/.test(office)||!/^\d{7,12}$/.test(code)||!['30','90','365','all'].includes(period)
  ||raw.length>100||!canonicalMenu(raw))return NextResponse.json({error:'메뉴 또는 조회 범위를 확인해 주세요.'},{status:400});
+ if(!isArchivedSchool(office,code))return NextResponse.json({error:'북일고 외 학교의 메뉴 기록은 저장하지 않으므로 통계를 제공하지 않아요.'},{status:422});
  if(!process.env.DATABASE_URL)return NextResponse.json({error:'DB 연결이 필요합니다.'},{status:503});
  const name=canonicalMenu(raw),today=kstDate(),from=period==='all'?'2000-01-01':shiftDay(today,-Number(period)+1);
  try{

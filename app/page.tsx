@@ -2,6 +2,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {kstDate,shiftDay,mondayOf} from '@/lib/time';
 import {canonicalMenu,splitMenuItems} from '@/lib/menu';
+import {isRoutineMenu} from '@/lib/menu-ranking';
 import FavoritesPanel from './components/FavoritesPanel';
 import {normalizeNutrients,nutrientMeta,nutrientOrder,reference,macroRatio,type ReferenceProfile,type NutrientId} from '@/lib/nutrition';
 type School={office:string;code:string;name:string};
@@ -74,6 +75,7 @@ export default function Home(){
  const [matches,setMatches]=useState<School[]>([]),[dataStatus,setDataStatus]=useState<{data?:{meals:number;days:number;oldest:string;newest:string};sync?:{status:string;started:string;count:number};backfill?:{cursor:string;completed:boolean}}|null>(null);
  const [chosenCategory,setChosenCategory]=useState('국·찌개'),[metric,setMetric]=useState<TrendBarsProp>('kcal');
  const [favorites,setFavorites]=useState<string[]>([]),[selectedMenu,setSelectedMenu]=useState('');
+ const [hideRoutineMenus,setHideRoutineMenus]=useState(true),[hiddenRankingMenus,setHiddenRankingMenus]=useState<string[]>([]);
  const swipe=useRef<number|null>(null),mealCache=useRef<Map<string,Meal[]>>(new Map()),statsCache=useRef<Map<string,Stats>>(new Map());
  type TrendBarsProp='kcal'|'protein'|'calcium'|'iron'|'vitc'|'uniqueMenus';
  useEffect(()=>{setDate(kstDate());try{
@@ -81,6 +83,20 @@ export default function Home(){
   const pref=localStorage.getItem('school-meal-reference');if(pref==='male'||pref==='female')setProfile(pref);
  }catch{}},[]);
  useEffect(()=>{try{const value=localStorage.getItem('school-meal-favorites:'+school.office+':'+school.code);const saved=value?JSON.parse(value):[];setFavorites(Array.isArray(saved)?[...new Set<string>(saved.filter((x:unknown)=>typeof x==='string'&&x.length<=100))]:[])}catch{setFavorites([])}},[school.office,school.code]);
+ useEffect(()=>{
+  const key='school-meal-ranking:'+school.office+':'+school.code;
+  try{const saved=JSON.parse(localStorage.getItem(key)||'{}');
+   setHideRoutineMenus(saved.hideRoutine!==false);
+   setHiddenRankingMenus(Array.isArray(saved.hiddenNames)?saved.hiddenNames.filter((x:unknown)=>typeof x==='string'&&(x as string).length<=100):[]);
+  }catch{setHideRoutineMenus(true);setHiddenRankingMenus([])}
+ },[school.office,school.code]);
+ const persistRanking=(hideRoutine:boolean,hiddenNames:string[])=>{
+  setHideRoutineMenus(hideRoutine);setHiddenRankingMenus(hiddenNames);
+  try{localStorage.setItem('school-meal-ranking:'+school.office+':'+school.code,JSON.stringify({hideRoutine,hiddenNames}))}catch{}
+ };
+ const toggleRankingHidden=(name:string)=>{const key=canonicalMenu(name);if(!key)return;
+  persistRanking(hideRoutineMenus,hiddenRankingMenus.includes(key)?hiddenRankingMenus.filter(x=>x!==key):[...hiddenRankingMenus,key])
+ };
  const weekStart=useMemo(()=>date?mondayOf(date):'',[date]),weekEnd=weekStart?shiftDay(weekStart,6):'';
  const week=useMemo(()=>weekStart?Array.from({length:7},(_,i)=>shiftDay(weekStart,i)):[],[weekStart]);
  const mealKey=school.office+':'+school.code+':'+weekStart;
@@ -114,6 +130,7 @@ export default function Home(){
   return()=>{live=false};
  },[section,school]);
  const meal=list.find(m=>m.date===date&&m.type===mealType);
+ const rankedMenus=stats?.topMenus.filter(m=>!(hideRoutineMenus&&isRoutineMenu(m.name))&&!hiddenRankingMenus.includes(canonicalMenu(m.name)))||[];
  const onProfile=(value:ReferenceProfile)=>{setProfile(value);try{localStorage.setItem('school-meal-reference',value)}catch{}};
  function toggleFavorite(name:string){const canonical=canonicalMenu(name);if(!canonical)return;
   setFavorites(old=>{const next=old.includes(canonical)?old.filter(x=>x!==canonical):[...old,canonical];
@@ -144,14 +161,21 @@ export default function Home(){
  <div className="filters"><label>기간<select value={period} onChange={e=>setPeriod(e.target.value)}><option value="30">최근 30일</option><option value="90">최근 90일</option><option value="365">최근 1년</option><option value="all">전체 기록</option></select></label>
  <label>식사<select value={filterType} onChange={e=>setFilterType(Number(e.target.value))}><option value="0">전체</option><option value="1">아침</option><option value="2">점심</option><option value="3">저녁</option></select></label></div>
  <div className="subtabs">{[{value:'overview',label:'개요'},{value:'menu',label:'메뉴'},{value:'nutrition',label:'영양'},{value:'trend',label:'추세'}].map(o=><button key={o.value} className={analysisTab===o.value?'active':''} onClick={()=>setAnalysisTab(o.value as AnalysisTab)}>{o.label}</button>)}</div>
- {statsLoading?<div className="surface loading-state">기록을 분석하고 있어요…</div>:statsNotice?<div className="surface empty-state">{statsNotice}</div>:!stats?<div className="surface empty-state">분석 데이터를 불러오는 중…</div>:stats.summary.count===0?<div className="surface empty-state">선택한 기간의 기록이 아직 없어요.<p className="note">급식 조회·자동 수집 후 분석에 반영됩니다.</p></div>:<>
+ {(school.office!=='N10'||school.code!=='8140270')?<div className="surface empty-state">북일고 이외의 학교는 급식 조회만 가능해요.<p className="note">다른 학교의 급식은 데이터베이스에 저장하거나 분석하지 않습니다.</p></div>:statsLoading?<div className="surface loading-state">기록을 분석하고 있어요…</div>:statsNotice?<div className="surface empty-state">{statsNotice}</div>:!stats?<div className="surface empty-state">분석 데이터를 불러오는 중…</div>:stats.summary.count===0?<div className="surface empty-state">선택한 기간의 기록이 아직 없어요.<p className="note">급식 조회·자동 수집 후 분석에 반영됩니다.</p></div>:<>
  {analysisTab==='overview'&&<><div className="summary-grid"><div className="surface"><span>누적 급식</span><strong>{nfmt(stats.summary.count)}<small> 끼</small></strong></div><div className="surface"><span>기록 날짜</span><strong>{nfmt(stats.summary.days)}<small> 일</small></strong></div></div>
  <article className="surface"><div className="eyebrow">MEAN ENERGY</div><div className="headline-number">{nfmt(stats.summary.kcal,1)} <small>kcal / 끼</small></div><p className="note">실제로 제공된 급식의 평균 열량이며 섭취 권장량이 아닙니다.</p></article>
  <h2>아침 · 점심 · 저녁</h2><div className="surface"><SmallBars rows={stats.byMeal.map(x=>({label:mealNames[x.type],value:x.kcal,hint:'kcal'}))}/></div>
  <h2>요일별 평균 열량</h2><div className="surface"><SmallBars rows={stats.byWeekday.map(x=>({label:weekdays[x.weekday],value:x.kcal,hint:'kcal'}))}/></div>
  <h2>주말과 평일</h2><div className="surface"><div className="detail-line"><span>평일 평균</span><strong>{nfmt(stats.weekend.weekday.kcal,1)} kcal</strong></div><div className="detail-line"><span>주말 평균</span><strong>{nfmt(stats.weekend.weekend.kcal,1)} kcal</strong></div><p className="note">평일 {stats.weekend.weekday.count}끼 · 주말 {stats.weekend.weekend.count}끼</p></div></>}
- {analysisTab==='menu'&&<><div className="surface"><div className="eyebrow">MENU FREQUENCY</div><div className="headline-number">{stats.topMenus.length?stats.topMenus[0].count:0}<small> 회</small></div><p className="quiet">가장 많이 등장한 음식의 기록 횟수</p></div>
- <h2>자주 나오는 메뉴</h2><div className="surface ranked-list">{stats.topMenus.map((m,i)=><div className="ranked-item" key={m.name}><span className="rank">{i+1}</span><div><button className="favorite-rank-name" onClick={()=>viewMenuDetail(m.name)}>{m.name}</button><small>{m.category} · 급식 등장률 {m.mealRate}%{m.repeatDays!==null?' · 평균 '+m.repeatDays+'일 간격':''}</small></div><button className={'favorite-star '+(favorites.includes(m.name)?'is-on':'')} aria-pressed={favorites.includes(m.name)} aria-label={m.name+(favorites.includes(m.name)?' 즐겨찾기 해제':' 즐겨찾기 추가')} onClick={()=>toggleFavorite(m.name)}>{favorites.includes(m.name)?'★':'☆'}</button><b>{m.count}회</b></div>)}</div>
+ {analysisTab==='menu'&&<><div className="surface"><div className="eyebrow">MENU FREQUENCY</div><div className="headline-number">{rankedMenus.length?rankedMenus[0].count:0}<small> 회</small></div><p className="quiet">선택한 순위 조건에서 가장 자주 등장한 메뉴</p></div>
+ <h2>자주 나오는 메뉴</h2>
+ <div className="surface ranking-controls">
+  <label className="ranking-checkbox"><input type="checkbox" checked={hideRoutineMenus} onChange={e=>persistRanking(e.target.checked,hiddenRankingMenus)}/><span>일반 밥·김치 제외</span></label>
+  <p className="note">단순한 밥과 김치는 기본적으로 제외하고, 김치찌개·볶음밥처럼 별도 음식은 표시합니다. 이 필터는 메뉴 순위에만 적용돼요.</p>
+  {hiddenRankingMenus.length>0&&<div className="ranking-excluded"><span className="quiet">직접 제외한 메뉴 · 눌러서 복원</span><div>{hiddenRankingMenus.map(name=><button key={name} onClick={()=>toggleRankingHidden(name)} title="순위에 다시 포함">{name} ×</button>)}</div>
+   <button className="ranking-restore" onClick={()=>persistRanking(hideRoutineMenus,[])}>직접 제외한 메뉴 모두 복원</button></div>}
+ </div>
+ <div className="surface ranked-list">{rankedMenus.length===0?<p className="note">표시할 메뉴가 없습니다. 제외 설정을 변경해 보세요.</p>:rankedMenus.slice(0,20).map((m,i)=><div className="ranked-item" key={m.name}><span className="rank">{i+1}</span><div><button className="favorite-rank-name" onClick={()=>viewMenuDetail(m.name)}>{m.name}</button><small>{m.category} · 급식 등장률 {m.mealRate}%{m.repeatDays!==null?' · 평균 '+m.repeatDays+'일 간격':''}</small></div><button className={'favorite-star '+(favorites.includes(m.name)?'is-on':'')} aria-pressed={favorites.includes(m.name)} aria-label={m.name+(favorites.includes(m.name)?' 즐겨찾기 해제':' 즐겨찾기 추가')} onClick={()=>toggleFavorite(m.name)}>{favorites.includes(m.name)?'★':'☆'}</button><b>{m.count}회</b><button className="ranking-hide-button" title="순위에서 제외" aria-label={m.name+' 순위에서 제외'} onClick={()=>toggleRankingHidden(m.name)}>×</button></div>)}</div>
  <h2>음식 유형별 빈도</h2><div className="surface"><SmallBars rows={stats.categories.map(c=>({label:c.category,value:c.count,hint:'회'}))}/><p className="note">전체 메뉴 항목의 등장 횟수입니다. 한 끼에 같은 유형이 여러 번 포함될 수 있어요.</p></div>
  <h2>요일 × 식사 시간대</h2><div className="surface"><div className="comparison-select"><span className="quiet">확인할 음식 유형</span><select value={chosenCategory} onChange={e=>setChosenCategory(e.target.value)}>{['밥·죽','국·찌개','면','육류·달걀','해산물','채소·반찬','김치','과일','유제품','빵·디저트','음료','기타'].map(c=><option key={c}>{c}</option>)}</select></div>
  <div className="heatmap"><div className="heat-head">요일</div>{[1,2,3].map(n=><div className="heat-head" key={n}>{mealNames[n]}</div>)}
@@ -177,7 +201,7 @@ export default function Home(){
  {notice&&<p className="alert-text">{notice}</p>}
  <h2>영양소 비교 기준</h2><div className="surface"><PillTabs options={[{value:'male' as const,label:'15–18세 남'},{value:'female' as const,label:'15–18세 여'}]} value={profile} onChange={onProfile}/>
  <p className="note">이 설정은 공식 참고 기준을 선택하는 기능이며, 사용자의 실제 필요량이나 건강 상태를 판단하지 않습니다.</p></div>
- <h2>데이터 수집 상태</h2><div className="surface">{dataStatus?.data?<><div className="detail-line"><span>저장된 식단</span><strong>{nfmt(dataStatus.data.meals)}끼</strong></div><div className="detail-line"><span>기록 날짜</span><strong>{nfmt(dataStatus.data.days)}일</strong></div><div className="detail-line"><span>가장 오래된 기록</span><strong>{dataStatus.data.oldest||'—'}</strong></div><div className="detail-line"><span>최근 기록</span><strong>{dataStatus.data.newest||'—'}</strong></div><div className="detail-line"><span>최근 자동 수집</span><strong>{dataStatus.sync?.status==='ok'?'성공':dataStatus.sync?.status==='failed'?'실패':'이력 없음'}</strong></div>
+ <h2>데이터 수집 상태</h2><div className="surface">{(school.office!=='N10'||school.code!=='8140270')?<p className="quiet">북일고 외 학교의 급식은 조회만 가능하며 DB에 저장하지 않습니다.</p>:dataStatus?.data?<><div className="detail-line"><span>저장된 식단</span><strong>{nfmt(dataStatus.data.meals)}끼</strong></div><div className="detail-line"><span>기록 날짜</span><strong>{nfmt(dataStatus.data.days)}일</strong></div><div className="detail-line"><span>가장 오래된 기록</span><strong>{dataStatus.data.oldest||'—'}</strong></div><div className="detail-line"><span>최근 기록</span><strong>{dataStatus.data.newest||'—'}</strong></div><div className="detail-line"><span>최근 자동 수집</span><strong>{dataStatus.sync?.status==='ok'?'성공':dataStatus.sync?.status==='failed'?'실패':'이력 없음'}</strong></div>
  {dataStatus.backfill&&<p className="note">과거 급식 수집: {dataStatus.backfill.completed?'완료':'진행 중'} · 탐색 기준 {dataStatus.backfill.cursor}</p>}</>:<p className="quiet">데이터 수집 정보를 조회하고 있어요.</p>}
  <p className="note">기록은 DB에 유지됩니다. 자동 수집은 기본 학교를 중심으로 실행되며 다른 학교는 조회한 날짜가 저장돼요.</p></div>
  <p className="data-caption">School Meal · NEIS 기반 학교 식단 아카이브 · 2025 KDRI</p></section>}

@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {neon} from '@neondatabase/serverless';
+import {isArchivedSchool} from '@/lib/meals';
 import {canonicalMenu} from '@/lib/menu';
 import {kstDate} from '@/lib/time';
 export const runtime='nodejs';
@@ -8,6 +9,7 @@ export async function GET(req:NextRequest){
  raw=(p.get('q')||'').trim();
  if(!/^[A-Z]\d{2}$/.test(office)||!/^\d{7,12}$/.test(code)||raw.length>50)
   return NextResponse.json({error:'검색 조건을 확인해 주세요.'},{status:400});
+ if(!isArchivedSchool(office,code))return NextResponse.json({error:'메뉴 검색과 즐겨찾기 통계는 북일고 기록만 제공해요.'},{status:422});
  if(!process.env.DATABASE_URL)return NextResponse.json({error:'DB 연결이 필요합니다.'},{status:503});
  const query=canonicalMenu(raw);
  // Treat input as literal substring, not user-controlled SQL wildcard.

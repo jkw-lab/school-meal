@@ -21,7 +21,7 @@ Scheduled endpoint: `/api/cron/sync` at 20:10 UTC (=05:10 KST) via Vercel. It re
 1. Apply `migrations/002_analytics.sql` to the existing Neon database. It is additive and preserves existing meals.
 2. The app's first fresh lookup fills `meal_items` for that date range; scheduled backfill indexes older ranges.
 3. `/api/status` exposes archival progress and latest synchronization run.
-4. For another school, browsing menus stores the selected period; scheduled archival currently focuses on default school (북일고).
+4. Only 북일고등학교 (`N10`/`8140270`) is persisted. Other schools can still be searched and their live NEIS meals viewed, but no database reads or writes are performed for those schools through application endpoints. Existing historical rows from other schools are not deleted automatically.
 
 ## Local development
 
@@ -50,3 +50,9 @@ See `.env.example`. `npm run build` runs type validation through Next.
 - Favorites use each device/browser's `localStorage`, scoped to the selected school. They are **not synced between devices**, and clearing browsing data resets the list. No favorite records are added to Neon.
 - The selected menu's history is queried read-only from Neon via `/api/menu-stats`; `/api/menu-search` searches normalized menu names already archived. Statistics include past meals through today only. Upcoming scheduled meals are listed separately.
 - Query filters use exact normalized names; school/day/time counts remain contingent on NEIS archive coverage.
+
+## Customizable top-menu rankings
+
+- Under 분석 → 메뉴, common plain rice and standard kimchi are hidden from **the ranking only** by default. The checkbox restores them. Kimchi stew and fried rice are not treated as plain staples.
+- Click × beside any ranked item to hide that individual menu; excluded names are shown above the chart and can be restored. Filter settings persist per school in browser localStorage.
+- These visual filters never delete meal records or affect nutrition, category statistics, favorites, or the source archive.

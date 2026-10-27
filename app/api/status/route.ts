@@ -1,10 +1,12 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {neon} from '@neondatabase/serverless';
+import {isArchivedSchool} from '@/lib/meals';
 export const runtime='nodejs';
 export async function GET(request:NextRequest){
  if(!process.env.DATABASE_URL)return NextResponse.json({error:'DB not connected'},{status:503});
  const p=request.nextUrl.searchParams,office=p.get('office')||'N10',code=p.get('code')||'8140270';
  if(!/^[A-Z]\d{2}$/.test(office)||!/^\d{7,12}$/.test(code))return NextResponse.json({error:'Invalid school'},{status:400});
+ if(!isArchivedSchool(office,code))return NextResponse.json({error:'Only Bukil school data is archived'},{status:422});
  const db=neon(process.env.DATABASE_URL);
  try{
   const [data,sync,backfill]=await Promise.all([

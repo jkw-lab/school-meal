@@ -4,6 +4,9 @@ import {normalizeNutrients} from './nutrition';
 export type Meal={date:string;type:number;menu:string[];kcal:number|null;nutrients:Record<string,number>};
 export type SourceMeal=Meal&{rawMenu:string;rawNutrition:string;rawOrigin:string;updatedAt:string|null};
 const api='https://open.neis.go.kr/hub/mealServiceDietInfo';
+/** Only Bukil High School is archived. Other schools remain NEIS-only read-through. */
+export const ARCHIVE_SCHOOL={office:'N10',code:'8140270',name:'북일고등학교'} as const;
+export function isArchivedSchool(office:string,code:string){return office===ARCHIVE_SCHOOL.office&&code===ARCHIVE_SCHOOL.code;}
 function parseNutrients(text:string):Record<string,number>{
  const out:Record<string,number>={};
  for(const line of text.split(/<br\s*\/?\s*>|\n/gi)){
@@ -41,7 +44,7 @@ export async function fetchMeals(office:string,code:string,from:string,to:string
  return [...result.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.type-b.type);
 }
 export async function archiveMeals(office:string,code:string,name:string,meals:SourceMeal[]):Promise<number>{
- if(!meals.length)return 0;
+ if(!isArchivedSchool(office,code)||!meals.length)return 0;
  if(!process.env.DATABASE_URL)throw new Error('DATABASE_URL 미설정');
  const db=neon(process.env.DATABASE_URL);
  await db`INSERT INTO schools(office_code,school_code,school_name) VALUES(${office},${code},${name})
@@ -86,7 +89,7 @@ export async function archiveMeals(office:string,code:string,name:string,meals:S
  return meals.length;
 }
 export async function archivedMeals(office:string,code:string,from:string,to:string):Promise<Meal[]>{
- if(!process.env.DATABASE_URL)return [];
+ if(!isArchivedSchool(office,code)||!process.env.DATABASE_URL)return [];
  const db=neon(process.env.DATABASE_URL);
  const rows=await db`SELECT meal_date::text AS date,meal_type AS type,raw_menu,calorie_kcal,nutrients
  FROM meals WHERE office_code=${office} AND school_code=${code} AND meal_date BETWEEN ${from}::date AND ${to}::date
@@ -96,6 +99,7 @@ export async function archivedMeals(office:string,code:string,from:string,to:str
   kcal:x.calorie_kcal===null?null:Number(x.calorie_kcal),nutrients:x.nutrients||{}}));
 }
 export async function syncWindow(office:string,code:string,name:string,from:string,to:string){
+ if(!isArchivedSchool(office,code))throw new Error('Only Bukil High School can be archived');
  const db=process.env.DATABASE_URL?neon(process.env.DATABASE_URL):null;
  const started=db?await db`INSERT INTO sync_runs(office_code,school_code,range_start,range_end,status)
  VALUES(${office},${code},${from}::date,${to}::date,'running') RETURNING id`:null;

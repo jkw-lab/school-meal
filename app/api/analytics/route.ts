@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {neon} from '@neondatabase/serverless';
+import {isArchivedSchool} from '@/lib/meals';
 import {kstDate,shiftDay} from '@/lib/time';
 import {normalizeNutrients,nutrientMeta,nutrientOrder,macroRatio,type NutrientId} from '@/lib/nutrition';
 export const runtime='nodejs';
@@ -13,6 +14,7 @@ export async function GET(req:NextRequest){
   period=q.get('period')||'90',type=Number(q.get('type')||'0');
  if(!/^[A-Z]\d{2}$/.test(office)||!/^\d{7,12}$/.test(code)||!['30','90','365','all'].includes(period)||![0,1,2,3].includes(type))
   return NextResponse.json({error:'분석 필터 오류'},{status:400});
+ if(!isArchivedSchool(office,code))return NextResponse.json({error:'북일고 외 학교는 급식 조회만 지원하며 DB 통계를 제공하지 않아요.'},{status:422});
  if(!process.env.DATABASE_URL)return NextResponse.json({error:'DB 연결 설정 필요'},{status:503});
  const today=kstDate(),from=period==='all'?'2000-01-01':shiftDay(today,-Number(period)+1);
  try{
@@ -54,7 +56,7 @@ export async function GET(req:NextRequest){
    entry.count++;entry.dates.add(m.date);entry.ids.add(m.id);
    const category=categoryGroups.get(m.category)||{count:0,mealIds:new Set<string>()};category.count++;category.mealIds.add(m.id);categoryGroups.set(m.category,category);
   }
-  const topMenus=[...menuGroups.values()].sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name)).slice(0,30).map(m=>{
+  const topMenus=[...menuGroups.values()].sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name)).slice(0,500).map(m=>{
    const ordered=[...m.dates].sort(),gaps=ordered.slice(1).map((d,i)=>Math.round((Date.parse(d)-Date.parse(ordered[i]))/86400000));
    return {name:m.name,category:m.category,count:m.count,mealRate:meals.length?Math.round(m.ids.size/meals.length*100):0,repeatDays:mean(gaps)};
   });
