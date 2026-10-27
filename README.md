@@ -56,3 +56,9 @@ See `.env.example`. `npm run build` runs type validation through Next.
 - Under 분석 → 메뉴, common plain rice and standard kimchi are hidden from **the ranking only** by default. The checkbox restores them. Kimchi stew and fried rice are not treated as plain staples.
 - Click × beside any ranked item to hide that individual menu; excluded names are shown above the chart and can be restored. Filter settings persist per school in browser localStorage.
 - These visual filters never delete meal records or affect nutrition, category statistics, favorites, or the source archive.
+
+## App versioning
+
+- The authoritative app version lives in `package.json` and is displayed automatically under **설정 → 앱 정보**.
+- Bump the version on future releases, update the release date in the settings UI, and describe changes in Git history.
+- Release `v0.2.0` (2026-10-27) adds visible version information and reflects the current favorites, analytics, and Bukil-only archival release.

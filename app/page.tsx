@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
+import appPackage from '../package.json';
 import {kstDate,shiftDay,mondayOf} from '@/lib/time';
 import {canonicalMenu,splitMenuItems} from '@/lib/menu';
 import {isRoutineMenu} from '@/lib/menu-ranking';
@@ -203,8 +204,14 @@ export default function Home(){
  <p className="note">이 설정은 공식 참고 기준을 선택하는 기능이며, 사용자의 실제 필요량이나 건강 상태를 판단하지 않습니다.</p></div>
  <h2>데이터 수집 상태</h2><div className="surface">{(school.office!=='N10'||school.code!=='8140270')?<p className="quiet">북일고 외 학교의 급식은 조회만 가능하며 DB에 저장하지 않습니다.</p>:dataStatus?.data?<><div className="detail-line"><span>저장된 식단</span><strong>{nfmt(dataStatus.data.meals)}끼</strong></div><div className="detail-line"><span>기록 날짜</span><strong>{nfmt(dataStatus.data.days)}일</strong></div><div className="detail-line"><span>가장 오래된 기록</span><strong>{dataStatus.data.oldest||'—'}</strong></div><div className="detail-line"><span>최근 기록</span><strong>{dataStatus.data.newest||'—'}</strong></div><div className="detail-line"><span>최근 자동 수집</span><strong>{dataStatus.sync?.status==='ok'?'성공':dataStatus.sync?.status==='failed'?'실패':'이력 없음'}</strong></div>
  {dataStatus.backfill&&<p className="note">과거 급식 수집: {dataStatus.backfill.completed?'완료':'진행 중'} · 탐색 기준 {dataStatus.backfill.cursor}</p>}</>:<p className="quiet">데이터 수집 정보를 조회하고 있어요.</p>}
- <p className="note">기록은 DB에 유지됩니다. 자동 수집은 기본 학교를 중심으로 실행되며 다른 학교는 조회한 날짜가 저장돼요.</p></div>
- <p className="data-caption">School Meal · NEIS 기반 학교 식단 아카이브 · 2025 KDRI</p></section>}
+ <p className="note">기록은 DB에 유지됩니다. 북일고 급식만 DB에 누적되며, 다른 학교는 NEIS 실시간 조회만 지원해요.</p></div>
+ <h2>앱 정보</h2><div className="surface">
+ <div className="detail-line"><span>앱</span><strong>School Meal</strong></div>
+ <div className="detail-line"><span>버전</span><strong>v{appPackage.version}</strong></div>
+ <div className="detail-line"><span>업데이트</span><strong>2026.10.27</strong></div>
+ <a className="source-link" href="https://github.com/jkw-lab/school-meal/commits/main" target="_blank" rel="noreferrer">GitHub 변경 내역 확인</a>
+ </div>
+ <p className="data-caption">School Meal v{appPackage.version} · NEIS 기반 학교 식단 아카이브 · 2025 KDRI</p></section>}
  </main>
  <nav className="bottom-nav" aria-label="기본 메뉴">{navs.map(n=><button key={n.tab} onClick={()=>setSection(n.tab)} className={section===n.tab?'on':''} aria-current={section===n.tab?'page':undefined}><span className="nav-icon" aria-hidden="true">{n.icon}</span><span>{n.label}</span></button>)}</nav>
  </div>;
